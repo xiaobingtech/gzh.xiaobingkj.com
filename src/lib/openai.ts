@@ -1,14 +1,31 @@
 import OpenAI from "openai";
 
-// Initialize the OpenAI client
-const openai = new OpenAI({
+// Determine which API provider to use
+const API_PROVIDER = process.env.API_PROVIDER?.toLowerCase() || 'auto';
+console.log(`API provider configured as: ${API_PROVIDER}`);
+
+// Initialize the Deepseek client
+const deepseekClient = new OpenAI({
   baseURL: "https://api.deepseek.com/v1",
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || "",
+  dangerouslyAllowBrowser: true, // Allow usage in browser
+});
+
+// Initialize the standard OpenAI client as fallback
+const openaiClient = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY || "",
   dangerouslyAllowBrowser: true, // Allow usage in browser
 });
 
 export async function generateArticle(topic: string): Promise<{ content: string; title: string }> {
   try {
+    console.log("Starting article generation for topic:", topic);
+    
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("API key is missing or empty");
+      throw new Error("API key is not configured");
+    }
+    
     const systemPrompt = `Role: 专业情感类公众号爆文创作专家
 Background: 用户需要为微信公众号创作引人入胜的爆款文章，期望文章能够引发读者共鸣，获得高阅读量和转发量，提高公众号影响力和粉丝黏性。
 Profile: 你是一位在自媒体内容创作领域拥有多年经验的资深写手，精通情感类故事创作、人物塑造、叙事结构设计以及爆款标题制作，擅长捕捉读者心理需求，能够将日常情感故事转化为引人入胜的爆款内容，精准把握用户痛点，将情感冲突与共鸣点完美融合。
@@ -34,43 +51,105 @@ Examples:
 
     const userPrompt = `请根据主题"${topic}"创作一篇爆款文章，要求每个段落都强调一个点睛句子，文章长度必须在1000-1500字之间，并且以JSON格式返回，包含title和content两个字段。`;
 
-    const response = await openai.chat.completions.create({
-      model: "deepseek-chat",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.8,
-      max_tokens: 3000,
-    });
-
-    const responseText = response.choices[0]?.message?.content || '{"title":"生成失败","content":"无法生成文章，请重试。"}';
-    let result;
-    
-    try {
-      // Try to parse the response as JSON
-      result = JSON.parse(responseText);
-    } catch (error) {
-      // If parsing fails, create a structured response
-      console.error("Failed to parse JSON response:", error);
-      
-      // Try to extract a title if it exists in the response
-      const titleMatch = responseText.match(/《(.*?)》/) || ["", "精彩文章"];
-      const extractedTitle = titleMatch[1];
-      
-      // Create a structured response with the content without any potential title
-      result = {
-        title: extractedTitle,
-        content: responseText.replace(/^#\s+(.+)$/m, "").trim() // Remove any markdown title format
-      };
+    // Use OpenAI directly if specified
+    if (API_PROVIDER === 'openai') {
+      return await generateWithOpenAI(systemPrompt, userPrompt);
     }
-
-    return result;
-  } catch (error) {
+    
+    // Use Deepseek directly if specified
+    if (API_PROVIDER === 'deepseek') {
+      return await generateWithDeepseek(systemPrompt, userPrompt);
+    }
+    
+    // Auto fallback (try Deepseek, then OpenAI)
+    try {
+      console.log("Trying Deepseek API first (auto fallback mode)");
+      return await generateWithDeepseek(systemPrompt, userPrompt);
+    } catch (deepseekError) {
+      console.error("Deepseek API failed, falling back to OpenAI:", deepseekError);
+      console.log("Trying OpenAI API as fallback");
+      return await generateWithOpenAI(systemPrompt, userPrompt);
+    }
+  } catch (error: Error | unknown) {
     console.error("Error generating article:", error);
+    const errorMessage = error instanceof Error ? error.message : "未知错误";
+    
     return {
       title: "生成失败",
-      content: "生成文章时出错，请确保API密钥有效并重试。"
+      content: "生成文章时出错，请确保API密钥有效并重试。" + (process.env.NODE_ENV === 'development' ? ` 错误信息: ${errorMessage}` : '')
+    };
+  }
+}
+
+async function generateWithDeepseek(systemPrompt: string, userPrompt: string): Promise<{ content: string; title: string }> {
+  const response = await deepseekClient.chat.completions.create({
+    model: "deepseek-chat",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ],
+    temperature: 0.8,
+    max_tokens: 3000,
+  });
+  
+  console.log("Deepseek API response received successfully");
+  
+  const responseText = response.choices[0]?.message?.content || '{"title":"生成失败","content":"无法生成文章，请重试。"}';
+  
+  try {
+    // Try to parse the response as JSON
+    const result = JSON.parse(responseText);
+    console.log("Successfully parsed response as JSON from Deepseek");
+    return result;
+  } catch (parseError) {
+    // If parsing fails, create a structured response
+    console.error("Failed to parse JSON response from Deepseek:", parseError);
+    console.log("Response text:", responseText.substring(0, 200) + "...");
+    
+    // Try to extract a title if it exists in the response
+    const titleMatch = responseText.match(/《(.*?)》/) || ["", "精彩文章"];
+    const extractedTitle = titleMatch[1];
+    
+    // Create a structured response with the content without any potential title
+    return {
+      title: extractedTitle,
+      content: responseText.replace(/^#\s+(.+)$/m, "").trim() // Remove any markdown title format
+    };
+  }
+}
+
+async function generateWithOpenAI(systemPrompt: string, userPrompt: string): Promise<{ content: string; title: string }> {
+  const response = await openaiClient.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ],
+    temperature: 0.8,
+    max_tokens: 2500,
+  });
+  
+  console.log("OpenAI API response received successfully");
+  
+  const responseText = response.choices[0]?.message?.content || '{"title":"生成失败","content":"无法生成文章，请重试。"}';
+  
+  try {
+    // Try to parse the response as JSON
+    const result = JSON.parse(responseText);
+    console.log("Successfully parsed response as JSON from OpenAI");
+    return result;
+  } catch (parseError) {
+    // If parsing fails, create a structured response
+    console.error("Failed to parse JSON response from OpenAI:", parseError);
+    
+    // Try to extract a title if it exists in the response
+    const titleMatch = responseText.match(/《(.*?)》/) || ["", "精彩文章"];
+    const extractedTitle = titleMatch[1];
+    
+    // Create a structured response with the content without any potential title
+    return {
+      title: extractedTitle,
+      content: responseText.replace(/^#\s+(.+)$/m, "").trim() // Remove any markdown title format
     };
   }
 }
