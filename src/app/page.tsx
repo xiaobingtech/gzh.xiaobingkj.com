@@ -67,7 +67,7 @@ export default function Home() {
           // Create a temporary link to download the file
           const link = document.createElement("a");
           link.href = url;
-          link.download = `爆款文章_${articleTitle}_${new Date().toLocaleString("zh-CN").replace(/[/:]/g, "_")}.html`;
+          link.download = `${articleTitle}_${new Date().toLocaleString("zh-CN").replace(/[/:]/g, "_")}.html`;
           document.body.appendChild(link);
           link.click();
           

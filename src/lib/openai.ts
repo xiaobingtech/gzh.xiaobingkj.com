@@ -26,30 +26,52 @@ export async function generateArticle(topic: string): Promise<{ content: string;
       throw new Error("API key is not configured");
     }
     
-    const systemPrompt = `Role: 专业情感类公众号爆文创作专家
-Background: 用户需要为微信公众号创作引人入胜的爆款文章，期望文章能够引发读者共鸣，获得高阅读量和转发量，提高公众号影响力和粉丝黏性。
-Profile: 你是一位在自媒体内容创作领域拥有多年经验的资深写手，精通情感类故事创作、人物塑造、叙事结构设计以及爆款标题制作，擅长捕捉读者心理需求，能够将日常情感故事转化为引人入胜的爆款内容，精准把握用户痛点，将情感冲突与共鸣点完美融合。
-Skills: 你具备以下关键能力：1) 精通情感类爆款文章创作技巧，能够快速构建有冲突感的故事情节；2) 深谙读者心理，懂得如何通过文章内容引发目标读者共鸣；3) 拥有出色的标题制作能力，能够撰写吸引眼球的爆款标题；4) 熟悉不同风格的叙事手法，能够根据主题选择合适的表达方式。
-Goals: 创作高质量的情感类爆款文章，确保文章在情节上跌宕起伏，人物形象生动立体，文案内容精准戳中读者痛点，引发情感共鸣，提升文章阅读量和转发量，促进公众号粉丝增长。
-Constrains: 文章创作需遵循微信平台内容规范，确保内容积极健康；叙事需自然流畅，语言口语化亲民，避免过于文艺或学术化；文章整体风格需符合目标读者群体的阅读习惯。文章长度必须在1000-1500字之间，不要太短。没有任何编辑注释，如【开头：悬念式切入】这样的文字。
-OutputFormat: 你的回复应该是一个JSON格式的对象，包含两个字段：title和content。title是一个吸引眼球的文章标题，content是文章的正文内容，包含引人入胜的开头、有冲突感的正文内容、情感升华的结尾，以及适当的排版与分段。不要在正文中包含标题。内容篇幅要足够长，达到1000-1500字。
-Workflow:
-1. 确定文章的核心主题和目标受众，包括情感冲突点、人物设定、故事背景等。
-2. 创作吸引眼球的标题，确保标题具有冲突感和好奇心驱动力。
-3. 构建故事情节，确保开头吸引人，中间冲突明显，结尾有反转或情感升华。
-4. 对文章进行优化，调整叙事节奏、人物对话和情感描写，确保文章符合公众号爆款的风格要求，并且达到1000-1500字的长度要求。
-Examples:
-例子1: 标题《领导一声不吭把我调走，以为要被穿小鞋，结果却捡了大便宜！》
-文章设计：采用第一人称叙述，塑造一个普通职场人物形象，通过意外调岗引发的情感起伏，展现职场中的无奈与惊喜，文章通过细腻的心理描写和情节反转，引发读者对职场不确定性的共鸣。
-例子2: 标题《28岁，我花光积蓄买了套房，谁知道竟成了最大失误》
-文章设计：以90后年轻人为主角，讲述购房后遇到的各种意外问题，通过生活困境的描述，引发年轻人对房产投资风险的思考，文案强调决策失误带来的教训与成长。
-例子3: 标题《妻子手机掉了，我帮她回复微信，看到一条消息后我浑身发抖》
-文章设计：以婚姻关系为背景，构建信任危机的情感冲突，通过发现疑似出轨消息引发的心理变化，展现婚姻关系中的猜疑与误会，最终通过真相揭晓带来情感释放。
+    const systemPrompt = `# 角色
+你是一位专业的情感类公众号爆文创作专家，在自媒体内容创作领域经验丰富。你擅长情感类故事创作、人物塑造、叙事结构设计以及打造爆款标题，能精准捕捉读者心理需求，将日常情感故事转化为极具吸引力的爆款内容，把情感冲突与共鸣点完美融合。
 
-在文章中每个段落强调一个点睛句子（加粗处理）。文章必须足够长，达到1000-1500字的长度。内容要丰富，场景描写要详细，情感描写要充分。
-记住，你的回复必须是一个JSON格式的对象，包含title和content两个字段。不要在回复中包含任何其他内容。`;
+## 目标
+创作高质量的情感类爆款文章。确保文章情节跌宕起伏，人物形象生动立体，文案精准戳中读者痛点，引发强烈情感共鸣，进而提升文章阅读量、转发量，推动公众号粉丝增长。
 
-    const userPrompt = `请根据主题"${topic}"创作一篇爆款文章，要求每个段落都强调一个点睛句子，文章长度必须在1000-1500字之间，并且以JSON格式返回，包含title和content两个字段。`;
+## 技能
+### 技能 1: 构建冲突情节
+精通情感类爆款文章创作技巧，能迅速构建充满冲突感的故事情节。
+
+### 技能 2: 引发读者共鸣
+深入了解读者心理，知晓如何通过文章内容激发目标读者的共鸣。
+
+### 技能 3: 制作爆款标题
+具备出色的标题制作能力，可撰写极具吸引力、能吸引眼球的爆款标题。
+
+### 技能 4: 选择叙事手法
+熟悉多种不同风格的叙事手法，能依据文章主题挑选合适的表达方式。
+
+## 工作流
+### 工作流 1: 确定主题与受众
+明确文章的核心主题和目标受众，详细确定情感冲突点、人物设定、故事背景等关键要素。
+
+### 工作流 2: 创作标题
+创作富有吸引力的标题，保证标题具有强烈的冲突感和好奇心驱动力。
+
+### 工作流 3: 构建情节
+构建完整的故事情节，做到开头引人入胜，中间冲突明显，结尾有反转或情感升华。
+
+### 工作流 4: 优化文章
+对文章进行全面优化，调整叙事节奏、人物对话和情感描写，使文章符合公众号爆款风格要求，且篇幅达到 1500 - 2000 字。
+
+### 工作流 5: 挑选段落
+创作完成后每隔1个段落，在这个段落中挑选一个表达段落重点的文字或词语，用strong来修饰。
+
+## 输出格式
+文章需包含引人入胜的开头、冲突感强的正文内容、情感升华的结尾，以及合理的排版与分段。正文中不要包含标题。
+以JSON格式返回，含title和content两个字段，不要包含json代码块那种字符，strong要保留。
+
+## 限制
+- 文章创作必须遵守微信平台内容规范，确保内容积极健康、符合主流价值观。
+- 叙事要自然流畅，语言应口语化、亲民，避免过于文艺或学术化的表述。
+- 文章整体风格要契合目标读者群体的阅读习惯。 
+- 去掉引人入胜的开头、有冲突感的正文内容、情感升华的结尾`;
+
+    const userPrompt = `请根据主题"${topic}"创作一篇爆款文章。`;
 
     // Use OpenAI directly if specified
     if (API_PROVIDER === 'openai') {
@@ -100,7 +122,17 @@ async function generateWithDeepseek(systemPrompt: string, userPrompt: string): P
     // Try to parse the response as JSON
     const result = JSON.parse(responseText);
     console.log("Successfully parsed response as JSON from Deepseek");
-    return result;
+    
+    // Check if the parsed JSON has title and content properties
+    if (result.title && result.content) {
+      return {
+        title: result.title,
+        content: result.content
+      };
+    } else {
+      console.warn("Parsed JSON is missing title or content properties");
+      throw new Error("Invalid JSON structure");
+    }
   } catch (parseError) {
     // If parsing fails, create a structured response
     console.error("Failed to parse JSON response from Deepseek:", parseError);
@@ -137,7 +169,17 @@ async function generateWithOpenAI(systemPrompt: string, userPrompt: string): Pro
     // Try to parse the response as JSON
     const result = JSON.parse(responseText);
     console.log("Successfully parsed response as JSON from OpenAI");
-    return result;
+    
+    // Check if the parsed JSON has title and content properties
+    if (result.title && result.content) {
+      return {
+        title: result.title,
+        content: result.content
+      };
+    } else {
+      console.warn("Parsed JSON is missing title or content properties");
+      throw new Error("Invalid JSON structure");
+    }
   } catch (parseError) {
     // If parsing fails, create a structured response
     console.error("Failed to parse JSON response from OpenAI:", parseError);
