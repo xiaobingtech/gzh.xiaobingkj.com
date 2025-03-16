@@ -31,7 +31,7 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error("生成失败");
+        throw new Error(response.statusText);
       }
 
       const data = await response.json();
