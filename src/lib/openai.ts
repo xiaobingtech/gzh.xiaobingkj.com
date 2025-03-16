@@ -19,12 +19,15 @@ const openaiClient = new OpenAI({
 
 export async function generateArticle(topic: string): Promise<{ content: string; title: string }> {
   try {
-    console.log("Starting article generation for topic:", topic);
+    console.log("开始为主题生成文章:", topic);
     
     if (!process.env.OPENAI_API_KEY) {
-      console.error("API key is missing or empty");
-      throw new Error("API key is not configured");
+      console.error("API密钥缺失或为空");
+      throw new Error("API密钥未配置");
     }
+    
+    console.log("使用的API提供商:", API_PROVIDER);
+    console.log("API密钥前6位:", process.env.OPENAI_API_KEY.substring(0, 6) + "...");
     
     const systemPrompt = `# 角色
 你是一位专业的情感类公众号爆文创作专家，在自媒体内容创作领域经验丰富。你擅长情感类故事创作、人物塑造、叙事结构设计以及打造爆款标题，能精准捕捉读者心理需求，将日常情感故事转化为极具吸引力的爆款内容，把情感冲突与共鸣点完美融合。
@@ -104,95 +107,119 @@ export async function generateArticle(topic: string): Promise<{ content: string;
 }
 
 async function generateWithDeepseek(systemPrompt: string, userPrompt: string): Promise<{ content: string; title: string }> {
-  const response = await deepseekClient.chat.completions.create({
-    model: "deepseek-chat",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ],
-    temperature: 0.8,
-    max_tokens: 3000,
-  });
-  
-  console.log("Deepseek API response received successfully");
-  
-  const responseText = response.choices[0]?.message?.content || '{"title":"生成失败","content":"无法生成文章，请重试。"}';
-  
   try {
-    // Try to parse the response as JSON
-    const result = JSON.parse(responseText);
-    console.log("Successfully parsed response as JSON from Deepseek");
+    console.log("开始调用Deepseek API...");
+    const response = await deepseekClient.chat.completions.create({
+      model: "deepseek-chat",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.8,
+      max_tokens: 3000,
+    });
     
-    // Check if the parsed JSON has title and content properties
-    if (result.title && result.content) {
+    console.log("Deepseek API响应成功接收");
+    
+    const responseText = response.choices[0]?.message?.content || '{"title":"生成失败","content":"无法生成文章，请重试。"}';
+    console.log("Deepseek API原始响应:", responseText.substring(0, 100) + "...");
+    
+    try {
+      // Try to parse the response as JSON
+      const result = JSON.parse(responseText);
+      console.log("成功将Deepseek响应解析为JSON");
+      
+      // Check if the parsed JSON has title and content properties
+      if (result.title && result.content) {
+        console.log("JSON包含title和content字段");
+        return {
+          title: result.title,
+          content: result.content
+        };
+      } else {
+        console.warn("解析的JSON缺少title或content属性");
+        console.log("解析后的JSON结构:", JSON.stringify(result));
+        throw new Error("JSON结构无效");
+      }
+    } catch (parseError) {
+      // If parsing fails, create a structured response
+      console.error("无法解析Deepseek的JSON响应:", parseError);
+      console.log("响应文本:", responseText.substring(0, 200) + "...");
+      
+      // Try to extract a title if it exists in the response
+      const titleMatch = responseText.match(/《(.*?)》/) || ["", "精彩文章"];
+      const extractedTitle = titleMatch[1];
+      
+      console.log("使用正则提取的标题:", extractedTitle);
+      
+      // Create a structured response with the content without any potential title
       return {
-        title: result.title,
-        content: result.content
+        title: extractedTitle,
+        content: responseText.replace(/^#\s+(.+)$/m, "").trim() // Remove any markdown title format
       };
-    } else {
-      console.warn("Parsed JSON is missing title or content properties");
-      throw new Error("Invalid JSON structure");
     }
-  } catch (parseError) {
-    // If parsing fails, create a structured response
-    console.error("Failed to parse JSON response from Deepseek:", parseError);
-    console.log("Response text:", responseText.substring(0, 200) + "...");
-    
-    // Try to extract a title if it exists in the response
-    const titleMatch = responseText.match(/《(.*?)》/) || ["", "精彩文章"];
-    const extractedTitle = titleMatch[1];
-    
-    // Create a structured response with the content without any potential title
-    return {
-      title: extractedTitle,
-      content: responseText.replace(/^#\s+(.+)$/m, "").trim() // Remove any markdown title format
-    };
+  } catch (apiError) {
+    console.error("调用Deepseek API时出错:", apiError);
+    throw apiError; // 重新抛出错误以便上层捕获
   }
 }
 
 async function generateWithOpenAI(systemPrompt: string, userPrompt: string): Promise<{ content: string; title: string }> {
-  const response = await openaiClient.chat.completions.create({
-    model: "deepseek",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ],
-    temperature: 0.8,
-    max_tokens: 2500,
-  });
-  
-  console.log("OpenAI API response received successfully");
-  
-  const responseText = response.choices[0]?.message?.content || '{"title":"生成失败","content":"无法生成文章，请重试。"}';
-  
   try {
-    // Try to parse the response as JSON
-    const result = JSON.parse(responseText);
-    console.log("Successfully parsed response as JSON from OpenAI");
+    console.log("开始调用OpenAI API...");
+    // 修正这里的model值，应该使用正确的OpenAI模型而不是"deepseek"
+    const response = await openaiClient.chat.completions.create({
+      model: "gpt-3.5-turbo", // 修正为正确的OpenAI模型
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.8,
+      max_tokens: 2500,
+    });
     
-    // Check if the parsed JSON has title and content properties
-    if (result.title && result.content) {
+    console.log("OpenAI API响应成功接收");
+    
+    const responseText = response.choices[0]?.message?.content || '{"title":"生成失败","content":"无法生成文章，请重试。"}';
+    console.log("OpenAI API原始响应:", responseText.substring(0, 100) + "...");
+    
+    try {
+      // Try to parse the response as JSON
+      const result = JSON.parse(responseText);
+      console.log("成功将OpenAI响应解析为JSON");
+      
+      // Check if the parsed JSON has title and content properties
+      if (result.title && result.content) {
+        console.log("JSON包含title和content字段");
+        return {
+          title: result.title,
+          content: result.content
+        };
+      } else {
+        console.warn("解析的JSON缺少title或content属性");
+        console.log("解析后的JSON结构:", JSON.stringify(result));
+        throw new Error("JSON结构无效");
+      }
+    } catch (parseError) {
+      // If parsing fails, create a structured response
+      console.error("无法解析OpenAI的JSON响应:", parseError);
+      console.log("响应文本:", responseText.substring(0, 200) + "...");
+      
+      // Try to extract a title if it exists in the response
+      const titleMatch = responseText.match(/《(.*?)》/) || ["", "精彩文章"];
+      const extractedTitle = titleMatch[1];
+      
+      console.log("使用正则提取的标题:", extractedTitle);
+      
+      // Create a structured response with the content without any potential title
       return {
-        title: result.title,
-        content: result.content
+        title: extractedTitle,
+        content: responseText.replace(/^#\s+(.+)$/m, "").trim() // Remove any markdown title format
       };
-    } else {
-      console.warn("Parsed JSON is missing title or content properties");
-      throw new Error("Invalid JSON structure");
     }
-  } catch (parseError) {
-    // If parsing fails, create a structured response
-    console.error("Failed to parse JSON response from OpenAI:", parseError);
-    
-    // Try to extract a title if it exists in the response
-    const titleMatch = responseText.match(/《(.*?)》/) || ["", "精彩文章"];
-    const extractedTitle = titleMatch[1];
-    
-    // Create a structured response with the content without any potential title
-    return {
-      title: extractedTitle,
-      content: responseText.replace(/^#\s+(.+)$/m, "").trim() // Remove any markdown title format
-    };
+  } catch (apiError) {
+    console.error("调用OpenAI API时出错:", apiError);
+    throw apiError; // 重新抛出错误以便上层捕获
   }
 }
 
