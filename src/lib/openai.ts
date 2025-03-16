@@ -165,10 +165,13 @@ async function generateWithDeepseek(systemPrompt: string, userPrompt: string): P
     let errorDetails = "未知错误";
     if (apiError && typeof apiError === 'object' && 'response' in apiError && apiError.response) {
       try {
-        const response = (apiError as any).response;
+        // 定义response类型，避免使用any
+        type ApiErrorResponse = { status: number; data: unknown };
+        const response = (apiError as { response: ApiErrorResponse }).response;
         errorDetails = `状态码: ${response.status}, 错误信息: ${JSON.stringify(response.data)}`;
-      } catch (_) {
-        const response = (apiError as any).response;
+      } catch {
+        // 不使用未使用的变量，直接使用空的catch块
+        const response = (apiError as { response: { status: number } }).response;
         errorDetails = `状态码: ${response.status}, 无法解析错误详情`;
       }
     } else if (apiError instanceof Error) {
@@ -238,10 +241,13 @@ async function generateWithOpenAI(systemPrompt: string, userPrompt: string): Pro
     let errorDetails = "未知错误";
     if (apiError && typeof apiError === 'object' && 'response' in apiError && apiError.response) {
       try {
-        const response = (apiError as any).response;
+        // 定义response类型，避免使用any
+        type ApiErrorResponse = { status: number; data: unknown };
+        const response = (apiError as { response: ApiErrorResponse }).response;
         errorDetails = `状态码: ${response.status}, 错误信息: ${JSON.stringify(response.data)}`;
-      } catch (_) {
-        const response = (apiError as any).response;
+      } catch {
+        // 不使用未使用的变量，直接使用空的catch块
+        const response = (apiError as { response: { status: number } }).response;
         errorDetails = `状态码: ${response.status}, 无法解析错误详情`;
       }
     } else if (apiError instanceof Error) {
