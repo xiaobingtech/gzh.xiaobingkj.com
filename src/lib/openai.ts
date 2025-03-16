@@ -101,7 +101,7 @@ export async function generateArticle(topic: string): Promise<{ content: string;
     
     return {
       title: "生成失败",
-      content: "生成文章时出错，请确保API密钥有效并重试。" + (process.env.NODE_ENV === 'development' ? ` 错误信息: ${errorMessage}` : '')
+      content: "生成文章时出错，错误原因：" + errorMessage + "。请确保API密钥有效并重试。"
     };
   }
 }
@@ -158,18 +158,32 @@ async function generateWithDeepseek(systemPrompt: string, userPrompt: string): P
         content: responseText.replace(/^#\s+(.+)$/m, "").trim() // Remove any markdown title format
       };
     }
-  } catch (apiError) {
+  } catch (apiError: unknown) {
     console.error("调用Deepseek API时出错:", apiError);
-    throw apiError; // 重新抛出错误以便上层捕获
+    
+    // 获取更详细的错误信息
+    let errorDetails = "未知错误";
+    if (apiError && typeof apiError === 'object' && 'response' in apiError && apiError.response) {
+      try {
+        const response = (apiError as any).response;
+        errorDetails = `状态码: ${response.status}, 错误信息: ${JSON.stringify(response.data)}`;
+      } catch (_) {
+        const response = (apiError as any).response;
+        errorDetails = `状态码: ${response.status}, 无法解析错误详情`;
+      }
+    } else if (apiError instanceof Error) {
+      errorDetails = apiError.message;
+    }
+    
+    throw new Error(`Deepseek API调用失败: ${errorDetails}`);
   }
 }
 
 async function generateWithOpenAI(systemPrompt: string, userPrompt: string): Promise<{ content: string; title: string }> {
   try {
     console.log("开始调用OpenAI API...");
-    // 修正这里的model值，应该使用正确的OpenAI模型而不是"deepseek"
     const response = await openaiClient.chat.completions.create({
-      model: "gpt-3.5-turbo", // 修正为正确的OpenAI模型
+      model: "gpt-3.5-turbo",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -217,9 +231,24 @@ async function generateWithOpenAI(systemPrompt: string, userPrompt: string): Pro
         content: responseText.replace(/^#\s+(.+)$/m, "").trim() // Remove any markdown title format
       };
     }
-  } catch (apiError) {
+  } catch (apiError: unknown) {
     console.error("调用OpenAI API时出错:", apiError);
-    throw apiError; // 重新抛出错误以便上层捕获
+    
+    // 获取更详细的错误信息
+    let errorDetails = "未知错误";
+    if (apiError && typeof apiError === 'object' && 'response' in apiError && apiError.response) {
+      try {
+        const response = (apiError as any).response;
+        errorDetails = `状态码: ${response.status}, 错误信息: ${JSON.stringify(response.data)}`;
+      } catch (_) {
+        const response = (apiError as any).response;
+        errorDetails = `状态码: ${response.status}, 无法解析错误详情`;
+      }
+    } else if (apiError instanceof Error) {
+      errorDetails = apiError.message;
+    }
+    
+    throw new Error(`OpenAI API调用失败: ${errorDetails}`);
   }
 }
 
