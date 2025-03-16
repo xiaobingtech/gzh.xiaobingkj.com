@@ -152,7 +152,7 @@ async function generateWithDeepseek(systemPrompt: string, userPrompt: string): P
 
 async function generateWithOpenAI(systemPrompt: string, userPrompt: string): Promise<{ content: string; title: string }> {
   const response = await openaiClient.chat.completions.create({
-    model: "gpt-3.5-turbo",
+    model: "deepseek",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
