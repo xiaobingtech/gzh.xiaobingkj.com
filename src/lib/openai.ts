@@ -15,12 +15,16 @@ const commonOptions = {
 // Initialize the Deepseek client
 const deepseekClient = new OpenAI({
   baseURL: "https://api.deepseek.com/v1",
-  ...commonOptions
+  ...commonOptions,
+  defaultQuery: { timeout: '120' }, // 修正为字符串类型
+  defaultHeaders: { 'Content-Type': 'application/json' }
 });
 
 // Initialize the standard OpenAI client as fallback
 const openaiClient = new OpenAI({
-  ...commonOptions
+  ...commonOptions,
+  defaultQuery: { timeout: '120' }, // 修正为字符串类型
+  defaultHeaders: { 'Content-Type': 'application/json' }
 });
 
 // 全局捕获未处理的 Promise 错误
@@ -158,7 +162,14 @@ export async function generateArticle(topic: string): Promise<{ content: string;
 async function generateWithDeepseek(systemPrompt: string, userPrompt: string): Promise<{ content: string; title: string }> {
   try {
     console.log("开始调用Deepseek API...");
-    const response = await deepseekClient.chat.completions.create({
+    
+    // 添加请求超时设置
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Deepseek API请求超时')), 110000);
+    });
+    
+    // 实际的API请求
+    const requestPromise = deepseekClient.chat.completions.create({
       model: "deepseek-chat",
       messages: [
         { role: "system", content: systemPrompt },
@@ -167,6 +178,9 @@ async function generateWithDeepseek(systemPrompt: string, userPrompt: string): P
       temperature: 0.8,
       max_tokens: 3000,
     });
+    
+    // 使用Promise.race来实现超时控制
+    const response = await Promise.race([requestPromise, timeoutPromise]);
     
     console.log("Deepseek API响应成功接收");
     
@@ -225,6 +239,15 @@ async function generateWithDeepseek(systemPrompt: string, userPrompt: string): P
       }
     } else if (apiError instanceof Error) {
       errorDetails = apiError.message;
+      
+      // 处理特定错误类型
+      if (errorDetails.includes('timeout') || errorDetails.includes('ETIMEDOUT')) {
+        errorDetails = "请求超时，服务器响应时间过长";
+      } else if (errorDetails.includes('ECONNREFUSED') || errorDetails.includes('ENOTFOUND')) {
+        errorDetails = "无法连接到API服务器，请检查网络连接";
+      } else if (errorDetails.includes('ECONNRESET')) {
+        errorDetails = "连接被重置，可能是服务器暂时不可用";
+      }
     }
     
     throw new Error(`Deepseek API调用失败: ${errorDetails}`);
@@ -234,7 +257,14 @@ async function generateWithDeepseek(systemPrompt: string, userPrompt: string): P
 async function generateWithOpenAI(systemPrompt: string, userPrompt: string): Promise<{ content: string; title: string }> {
   try {
     console.log("开始调用OpenAI API...");
-    const response = await openaiClient.chat.completions.create({
+    
+    // 添加请求超时设置
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('OpenAI API请求超时')), 110000);
+    });
+    
+    // 实际的API请求
+    const requestPromise = openaiClient.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         { role: "system", content: systemPrompt },
@@ -243,6 +273,9 @@ async function generateWithOpenAI(systemPrompt: string, userPrompt: string): Pro
       temperature: 0.8,
       max_tokens: 2500,
     });
+    
+    // 使用Promise.race来实现超时控制
+    const response = await Promise.race([requestPromise, timeoutPromise]);
     
     console.log("OpenAI API响应成功接收");
     
@@ -301,6 +334,15 @@ async function generateWithOpenAI(systemPrompt: string, userPrompt: string): Pro
       }
     } else if (apiError instanceof Error) {
       errorDetails = apiError.message;
+      
+      // 处理特定错误类型
+      if (errorDetails.includes('timeout') || errorDetails.includes('ETIMEDOUT')) {
+        errorDetails = "请求超时，服务器响应时间过长";
+      } else if (errorDetails.includes('ECONNREFUSED') || errorDetails.includes('ENOTFOUND')) {
+        errorDetails = "无法连接到API服务器，请检查网络连接";
+      } else if (errorDetails.includes('ECONNRESET')) {
+        errorDetails = "连接被重置，可能是服务器暂时不可用";
+      }
     }
     
     throw new Error(`OpenAI API调用失败: ${errorDetails}`);

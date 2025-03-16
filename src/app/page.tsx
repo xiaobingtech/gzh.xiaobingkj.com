@@ -32,7 +32,36 @@ export default function Home() {
         body: JSON.stringify({ topic }),
       });
 
-      const data = await response.json();
+      // 检查响应状态
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API错误响应:", errorText);
+        setErrorMessage(`服务器错误 (${response.status}): ${errorText.substring(0, 100)}${errorText.length > 100 ? '...' : ''}`);
+        setIsGenerated(false);
+        return;
+      }
+
+      // 检查内容类型头
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const errorText = await response.text();
+        console.error("非JSON响应:", errorText);
+        setErrorMessage(`服务器返回了非JSON格式数据: ${errorText.substring(0, 100)}${errorText.length > 100 ? '...' : ''}`);
+        setIsGenerated(false);
+        return;
+      }
+
+      // 现在我们确认响应是JSON格式的
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error("JSON解析错误:", jsonError);
+        const errorText = await response.text().catch(() => "无法读取响应内容");
+        setErrorMessage(`无法解析服务器响应: ${errorText.substring(0, 100)}${errorText.length > 100 ? '...' : ''}`);
+        setIsGenerated(false);
+        return;
+      }
       
       if (data.error) {
         setErrorMessage(data.message || data.content || "生成文章失败，请重试");
@@ -45,7 +74,16 @@ export default function Home() {
       setIsGenerated(true);
     } catch (error) {
       console.error("Error generating article:", error);
-      setErrorMessage(error instanceof Error ? error.message : "生成文章失败，请重试");
+      // 更详细的错误信息
+      let detailedError = "生成文章失败，请重试";
+      if (error instanceof Error) {
+        if (error.message.includes("Unexpected token")) {
+          detailedError = "服务器返回了格式错误的数据，这可能是由于服务器超时或内部错误导致的";
+        } else {
+          detailedError = error.message;
+        }
+      }
+      setErrorMessage(detailedError);
       setIsGenerated(false);
     } finally {
       setIsGenerating(false);
