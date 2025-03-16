@@ -13,13 +13,45 @@ export async function POST(request: Request) {
     }
 
     const articleData = await generateArticle(topic);
+    
+    // 检查是否有错误响应
+    if (articleData.title === "生成失败") {
+      // 如果生成失败，返回错误状态和详细信息
+      return NextResponse.json(
+        { 
+          error: "生成文章失败", 
+          message: articleData.content,
+          title: articleData.title,
+          content: articleData.content 
+        },
+        { status: 200 } // 依然使用200状态码，但包含错误信息
+      );
+    }
 
     return NextResponse.json(articleData);
   } catch (error) {
     console.error("Error in generate API:", error);
+    
+    // 获取更详细的错误信息
+    let errorMessage = "未知错误";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'object' && error !== null) {
+      try {
+        errorMessage = JSON.stringify(error);
+      } catch {
+        errorMessage = "无法序列化的错误对象";
+      }
+    }
+    
     return NextResponse.json(
-      { error: "生成文章失败，请重试" },
-      { status: 500 }
+      { 
+        error: "生成文章失败，请重试", 
+        message: errorMessage,
+        title: "生成失败",
+        content: `生成文章时出错，错误原因：${errorMessage}。请确保API密钥有效并重试。`
+      },
+      { status: 200 } // 使用200状态码而不是500，避免前端无法获取详细信息
     );
   }
 } 

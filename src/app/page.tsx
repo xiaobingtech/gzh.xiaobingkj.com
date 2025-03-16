@@ -12,6 +12,7 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isGenerated, setIsGenerated] = useState<boolean>(false);
   const [copySuccess, setCopySuccess] = useState<string>("");
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   async function handleGenerate() {
     if (!topic.trim()) {
@@ -21,6 +22,7 @@ export default function Home() {
 
     setIsGenerating(true);
     setCopySuccess("");
+    setErrorMessage("");
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -30,17 +32,21 @@ export default function Home() {
         body: JSON.stringify({ topic }),
       });
 
-      if (!response.ok) {
-        throw new Error(response.statusText);
+      const data = await response.json();
+      
+      if (data.error) {
+        setErrorMessage(data.message || data.content || "生成文章失败，请重试");
+        setIsGenerated(false);
+        return;
       }
 
-      const data = await response.json();
       setArticleContent(data.content);
       setArticleTitle(data.title);
       setIsGenerated(true);
     } catch (error) {
       console.error("Error generating article:", error);
-      alert("生成文章失败，请重试");
+      setErrorMessage(error instanceof Error ? error.message : "生成文章失败，请重试");
+      setIsGenerated(false);
     } finally {
       setIsGenerating(false);
     }
@@ -122,6 +128,13 @@ export default function Home() {
               {isGenerating ? "生成中..." : "开始生成"}
             </Button>
           </div>
+
+          {errorMessage && (
+            <div className="my-4 p-4 bg-red-50 border border-red-200 rounded-md text-red-600">
+              <p className="font-medium">生成失败</p>
+              <p className="text-sm mt-1">{errorMessage}</p>
+            </div>
+          )}
 
           {isGenerating && (
             <div className="text-center py-20">

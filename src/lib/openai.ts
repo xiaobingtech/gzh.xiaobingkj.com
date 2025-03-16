@@ -4,18 +4,33 @@ import OpenAI from "openai";
 const API_PROVIDER = process.env.API_PROVIDER?.toLowerCase() || 'auto';
 console.log(`API provider configured as: ${API_PROVIDER}`);
 
+// 添加通用的错误处理选项
+const commonOptions = {
+  apiKey: process.env.OPENAI_API_KEY || "",
+  dangerouslyAllowBrowser: true,
+  timeout: 120000, // 设置120秒超时
+  maxRetries: 3, // 最多重试3次
+};
+
 // Initialize the Deepseek client
 const deepseekClient = new OpenAI({
   baseURL: "https://api.deepseek.com/v1",
-  apiKey: process.env.OPENAI_API_KEY || "",
-  dangerouslyAllowBrowser: true, // Allow usage in browser
+  ...commonOptions
 });
 
 // Initialize the standard OpenAI client as fallback
 const openaiClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "",
-  dangerouslyAllowBrowser: true, // Allow usage in browser
+  ...commonOptions
 });
+
+// 全局捕获未处理的 Promise 错误
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', function(event) {
+    console.error('未捕获的Promise错误:', event.reason);
+    // 防止浏览器默认处理
+    event.preventDefault();
+  });
+}
 
 export async function generateArticle(topic: string): Promise<{ content: string; title: string }> {
   try {
@@ -88,16 +103,50 @@ export async function generateArticle(topic: string): Promise<{ content: string;
     
     // Auto fallback (try Deepseek, then OpenAI)
     try {
-      console.log("Trying Deepseek API first (auto fallback mode)");
+      console.log("尝试先使用Deepseek API (自动回退模式)");
       return await generateWithDeepseek(systemPrompt, userPrompt);
     } catch (deepseekError) {
-      console.error("Deepseek API failed, falling back to OpenAI:", deepseekError);
-      console.log("Trying OpenAI API as fallback");
+      console.error("Deepseek API失败，回退到OpenAI:", deepseekError);
+      
+      // 捕获特定的网络错误或超时错误并提供更友好的信息
+      if (deepseekError instanceof Error && 
+         (deepseekError.message.includes('timeout') || 
+          deepseekError.message.includes('network') ||
+          deepseekError.message.includes('ECONNREFUSED'))) {
+        throw new Error(`Deepseek服务连接超时，请稍后再试。详情: ${deepseekError.message}`);
+      }
+      
+      console.log("尝试使用OpenAI API作为备选");
       return await generateWithOpenAI(systemPrompt, userPrompt);
     }
   } catch (error: Error | unknown) {
-    console.error("Error generating article:", error);
-    const errorMessage = error instanceof Error ? error.message : "未知错误";
+    console.error("生成文章时出错:", error);
+    let errorMessage = "未知错误";
+    
+    // 增强错误信息提取
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      
+      // 处理特定错误类型
+      if (errorMessage.includes('statusText')) {
+        errorMessage = "API服务器返回错误状态，请稍后再试";
+      } else if (errorMessage.includes('timeout')) {
+        errorMessage = "请求超时，请稍后再试";
+      } else if (errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED')) {
+        errorMessage = "网络连接失败，请检查您的网络连接";
+      } else if (errorMessage.includes('401')) {
+        errorMessage = "API密钥无效或已过期，请更新您的API密钥";
+      } else if (errorMessage.includes('403')) {
+        errorMessage = "API密钥没有足够的权限";
+      } else if (errorMessage.includes('429')) {
+        errorMessage = "请求过于频繁，请稍后再试";
+      } else if (errorMessage.includes('500')) {
+        errorMessage = "API服务器内部错误，请稍后再试";
+      }
+    } else if (typeof error === 'object' && error !== null) {
+      // 尝试从对象中提取更多信息
+      errorMessage = JSON.stringify(error);
+    }
     
     return {
       title: "生成失败",
